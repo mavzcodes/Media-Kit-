@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixxel — Media Kit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #eeece8;
+  --text: #222;
+  --text-mid: #555;
+  --text-muted: #999;
+  --border: #d0cdc8;
+  --blue: #5b6ee1;
+  --white: #fff;
+  /* SVG shape: 0,0 → W,shear → W,H → 0,H-shear
+     From SVG: width=401, height=415, shear=120
+     ratio shear/height = 120/415 ≈ 0.289
+     We use card W=320 H=240, so shear = 240*0.289 ≈ 69px
+  */
+}
+
+html, body {
+  height: 100%;
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  overflow: hidden;
+}
+
+/* ─── APP SHELL ─── */
+.app { width: 100vw; height: 100vh; overflow: hidden; position: relative; }
+
+/* ─── VIEWS ─── */
+.view { position: absolute; inset: 0; display: none; }
+.view.active { display: flex; }
+
+/* ─── HOME VIEW ─── */
+#view-home { flex-direction: row; }
+
+.sidebar {
+  width: 136px; min-width: 136px;
+  padding: 30px 20px;
+  display: flex; flex-direction: column;
+  border-right: 0.5px solid var(--border);
+  z-index: 10; flex-shrink: 0;
+}
+.logo-img { width: 90px; margin-bottom: 4px; display: block; }
+.logo-sub {
+  font-size: 7px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 28px;
+}
+.nav-item {
+  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--text-muted); padding: 4px 0; cursor: pointer;
+  transition: color 0.14s; line-height: 1.9; user-select: none;
+}
+.nav-item:hover { color: var(--text); }
+.nav-item.active { color: var(--text); font-weight: 500; }
+.nav-divider { height: 0.5px; background: var(--border); margin: 10px 0; }
+.nav-item.dim { font-size: 8px; color: #bbb; }
+.nav-item.dim:hover { color: var(--text); }
+
+/* ─── STAGE ─── */
+.stage {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+}
+
+.breadcrumb {
+  position: absolute; top: 22px; left: 16px;
+  font-size: 8.5px; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--text-muted); display: flex; align-items: center; gap: 8px; z-index: 20;
+}
+.breadcrumb .crumb { cursor: pointer; transition: color 0.14s; }
+.breadcrumb .crumb:hover { color: var(--text); }
+.breadcrumb .sep { color: #ccc; }
+.breadcrumb .current { color: var(--text); }
+
+/* ─── STACK ─── */
+/*
+  SVG coords: (0,0),(401,120),(401,415),(0,295)
+  Card W=320 H=240 shear=69 (= 240 * 120/415)
+  clip-path uses percentages:
+    shear/W = 69/320 = 21.6%
+    (H-shear)/H = (240-69)/240 — not needed, we just use 0% and shear% on top
+  Points: TL(0,0) TR(100%,shear/H*100%) BR(100%,100%) BL(0,(H-shear)/H*100%)
+  shear/H = 69/240 = 28.75% → top-right Y = 28.75%
+  BL Y = (240-69)/240 = 71.25%
+  So: polygon(0% 0%, 100% 28.75%, 100% 100%, 0% 71.25%)
+*/
+
+.stack-scene {
+  position: relative;
+  /* sized by JS */
+}
+
+.card {
+  position: absolute;
+  cursor: pointer;
+  transition: transform 0.28s cubic-bezier(0.22, 0.68, 0, 1.15);
+  will-change: transform;
+}
+
+.card-shape {
+  width: 100%; height: 100%;
+  clip-path: polygon(0% 0%, 100% 28.75%, 100% 100%, 0% 71.25%);
+  overflow: hidden; position: relative;
+}
+
+.card-shape img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  filter: brightness(0.8);
+  transition: filter 0.22s ease;
+  pointer-events: none; user-select: none;
+  /* compensate for clip distortion so image fills fully */
+  transform: scaleX(1.04);
+  transform-origin: center;
+}
+.card:hover .card-shape img { filter: brightness(1); }
+
+.card-shape-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(200deg, rgba(0,0,0,0) 50%, rgba(0,0,0,0.22) 100%);
+  pointer-events: none;
+}
+
+/* Label: sits to the LEFT of each card, vertically centred */
+.card-label {
+  position: absolute;
+  right: calc(100% + 14px);
+  top: 40%; /* visual centre accounting for the parallelogram lean */
+  transform: translateY(-50%);
+  font-size: 9px; letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--text-mid); white-space: nowrap;
+  pointer-events: none; transition: color 0.2s;
+  text-align: right;
+}
+.card:hover .card-label { color: var(--text); }
+.card.card-blue .card-label { color: var(--blue); }
+.card.card-blue .card-shape { outline: 2px solid var(--blue); outline-offset: -2px; }
+
+/* ─── ABOUT VIEW ─── */
+#view-about { flex-direction: column; }
+
+.about-body {
+  flex: 1; overflow-y: auto;
+  padding: 56px 80px;
+  display: flex; flex-direction: column;
+  max-width: 760px;
+}
+.about-eyebrow {
+  font-size: 8px; letter-spacing: 0.18em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 10px;
+}
+.about-title {
+  font-size: 36px; font-weight: 300; color: var(--text);
+  line-height: 1.15; margin-bottom: 32px; letter-spacing: -0.01em;
+}
+.about-hr { border: none; border-top: 0.5px solid var(--border); margin: 28px 0; }
+.about-section-label {
+  font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 14px;
+}
+.about-text {
+  font-size: 13.5px; line-height: 1.9; color: #444;
+  margin-bottom: 28px; max-width: 560px;
+}
+.about-detail-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+  margin-bottom: 8px;
+}
+.about-detail-row {
+  display: flex; flex-direction: column;
+  padding: 14px 0;
+  border-bottom: 0.5px solid var(--border);
+}
+.about-detail-row:nth-child(odd) { padding-right: 40px; }
+.about-detail-key {
+  font-size: 8px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 5px;
+}
+.about-detail-val {
+  font-size: 13px; color: var(--text);
+  line-height: 1.5;
+}
+.about-detail-val a {
+  color: var(--text); text-decoration: underline;
+  text-underline-offset: 3px; text-decoration-color: var(--border);
+  transition: text-decoration-color 0.15s;
+}
+.about-detail-val a:hover { text-decoration-color: var(--text); }
+#view-inner {
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.inner-topbar {
+  height: 56px; min-height: 56px;
+  display: flex; align-items: center;
+  padding: 0 32px;
+  border-bottom: 0.5px solid var(--border);
+  gap: 20px; flex-shrink: 0;
+}
+
+.back-btn {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-mid); cursor: pointer; user-select: none;
+  background: none; border: 0.5px solid var(--border);
+  border-radius: 3px; padding: 6px 12px;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+}
+.back-btn:hover { background: var(--text); color: var(--white); border-color: var(--text); }
+.back-btn svg { width: 10px; height: 10px; flex-shrink: 0; }
+
+.inner-topbar-title {
+  font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.inner-body {
+  flex: 1; overflow-y: auto;
+  padding: 48px 64px;
+}
+
+/* Gallery page */
+.inner-tag {
+  font-size: 8px; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--text-muted); margin-bottom: 8px;
+}
+.inner-title {
+  font-size: 28px; font-weight: 400; color: var(--text);
+  margin-bottom: 8px; line-height: 1.2;
+}
+.inner-hr { border: none; border-top: 0.5px solid var(--border); margin: 24px 0; }
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.gallery-item img {
+  width: 100%; aspect-ratio: 4/3;
+  object-fit: cover; border-radius: 3px; display: block;
+}
+.gallery-caption {
+  font-size: 10px; color: var(--text-muted);
+  padding: 7px 0 0; line-height: 1.5;
+}
+
+/* Text / document page */
+.inner-text-body {
+  font-size: 14px; line-height: 1.95; color: #444;
+  white-space: pre-wrap; max-width: 640px;
+  user-select: text;
+}
+.copy-btn {
+  margin-top: 28px;
+  background: none; border: 0.5px solid var(--border); border-radius: 3px;
+  font-size: 8.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  padding: 8px 16px; cursor: pointer; color: var(--text-mid);
+  display: inline-flex; align-items: center; gap: 7px;
+  transition: background 0.14s, color 0.14s, border-color 0.14s;
+  font-family: 'Inter', sans-serif;
+}
+.copy-btn:hover { background: var(--text); color: var(--white); border-color: var(--text); }
+.copy-btn svg { width: 12px; height: 12px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ═══ HOME VIEW ═══ -->
+  <div class="view active" id="view-home">
+    <aside class="sidebar">
+      <img class="logo-img"
+        src="https://cdn.prod.website-files.com/67d135146f75e1842b217375/67d135e08bb4c56e946178b9_611623bf22a2a549a1443716_Light%20logo%402x-p-500.avif"
+        alt="Pixxel">
+      <div class="logo-sub">Media Kit</div>
+      <div class="nav-item active" id="nav-all"       onclick="navFilter('all')">All</div>
+      <div class="nav-item"        id="nav-imagery"   onclick="navFilter('imagery')">Imagery</div>
+      <div class="nav-item"        id="nav-documents" onclick="navFilter('documents')">Documents</div>
+      <div class="nav-item"        id="nav-videos"    onclick="navFilter('videos')">Videos</div>
+      <div class="nav-item"        id="nav-links"     onclick="navFilter('links')">Links</div>
+      <div class="nav-divider"></div>
+      <div class="nav-item dim" onclick="showAbout()">About</div>
+      <div class="nav-item dim">Contact</div>
+    </aside>
+
+    <div class="stage" id="stage">
+      <div class="breadcrumb" id="breadcrumb"></div>
+      <div class="stack-scene" id="stack-scene"></div>
+    </div>
+  </div>
+
+  <!-- ═══ INNER VIEW ═══ -->
+  <div class="view" id="view-inner">
+    <div class="inner-topbar">
+      <button class="back-btn" id="back-btn" onclick="goBack()">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" xmlns="http://www.w3.org/2000/svg">
+          <polyline points="7 2 3 6 7 10"/>
+        </svg>
+        Back
+      </button>
+      <span class="inner-topbar-title" id="inner-topbar-title"></span>
+    </div>
+    <div class="inner-body" id="inner-body"></div>
+  </div>
+
+  <!-- ═══ ABOUT VIEW ═══ -->
+  <div class="view" id="view-about">
+    <div class="inner-topbar">
+      <button class="back-btn" onclick="goHome()">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" xmlns="http://www.w3.org/2000/svg">
+          <polyline points="7 2 3 6 7 10"/>
+        </svg>
+        Back
+      </button>
+      <span class="inner-topbar-title">About</span>
+    </div>
+    <div class="about-body">
+      <p class="about-eyebrow">Pixxel Space — Media Kit 2025</p>
+      <h1 class="about-title">Seeing the unseen.<br>From orbit.</h1>
+
+      <p class="about-text">Pixxel is a space data company and spacecraft manufacturer building a health monitor for the planet. Our constellation of hyperspectral satellites captures data across 150+ spectral bands — revealing what conventional satellites can't see. The Aurora platform turns this data into actionable planetary intelligence for agriculture, forestry, energy, defence, and climate.</p>
+
+      <div class="about-hr"></div>
+      <p class="about-section-label">Contact</p>
+
+      <div class="about-detail-grid">
+        <div class="about-detail-row">
+          <span class="about-detail-key">Press & media</span>
+          <span class="about-detail-val"><a href="mailto:press@pixxel.space">press@pixxel.space</a></span>
+        </div>
+        <div class="about-detail-row">
+          <span class="about-detail-key">Partnerships</span>
+          <span class="about-detail-val"><a href="mailto:partners@pixxel.space">partners@pixxel.space</a></span>
+        </div>
+        <div class="about-detail-row">
+          <span class="about-detail-key">Investor relations</span>
+          <span class="about-detail-val"><a href="mailto:ir@pixxel.space">ir@pixxel.space</a></span>
+        </div>
+        <div class="about-detail-row">
+          <span class="about-detail-key">General enquiries</span>
+          <span class="about-detail-val"><a href="mailto:hello@pixxel.space">hello@pixxel.space</a></span>
+        </div>
+        <div class="about-detail-row">
+          <span class="about-detail-key">Phone</span>
+          <span class="about-detail-val">+91 80 4718 2200</span>
+        </div>
+        <div class="about-detail-row">
+          <span class="about-detail-key">Website</span>
+          <span class="about-detail-val"><a href="https://pixxel.space" target="_blank">pixxel.space</a></span>
+        </div>
+        <div class="about-detail-row">
+          <span class="about-detail-key">Headquarters</span>
+          <span class="about-detail-val">No. 18, 3rd Cross, Indiranagar<br>Bangalore — 560 038, India</span>
+        </div>
+        <div class="about-detail-row">
+          <span class="about-detail-key">US office</span>
+          <span class="about-detail-val">2118 Wilshire Blvd, Suite 1000<br>El Segundo, CA 90245, USA</span>
+        </div>
+        <div class="about-detail-row">
+          <span class="about-detail-key">Aurora platform</span>
+          <span class="about-detail-val"><a href="https://aurora.pixxel.space" target="_blank">aurora.pixxel.space</a></span>
+        </div>
+        <div class="about-detail-row">
+          <span class="about-detail-key">LinkedIn</span>
+          <span class="about-detail-val"><a href="https://linkedin.com/company/pixxel" target="_blank">linkedin.com/company/pixxel</a></span>
+        </div>
+        <div class="about-detail-row">
+          <span class="about-detail-key">X / Twitter</span>
+          <span class="about-detail-val"><a href="https://x.com/pixxelspace" target="_blank">@pixxelspace</a></span>
+        </div>
+        <div class="about-detail-row">
+          <span class="about-detail-key">Founded</span>
+          <span class="about-detail-val">2019 · Bangalore, India</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- .app -->
+
+<script>
+const IMG = {
+  earth1:  "https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=800&q=82",
+  earth2:  "https://images.unsplash.com/photo-1614730321146-b6fa6a46bcb4?w=800&q=82",
+  earth3:  "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800&q=82",
+  earth4:  "https://images.unsplash.com/photo-1567607083984-b94f12e50c38?w=800&q=82",
+  sat1:    "https://images.unsplash.com/photo-1581822261290-991b38693d1b?w=800&q=82",
+  sat2:    "https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800&q=82",
+  sat3:    "https://images.unsplash.com/photo-1569860894104-5748e18cd6c5?w=800&q=82",
+  space1:  "https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=800&q=82",
+  space2:  "https://images.unsplash.com/photo-1444703686981-a3abbc4d4fe3?w=800&q=82",
+  space3:  "https://images.unsplash.com/photo-1538370965046-79c0d6907d47?w=800&q=82",
+  space4:  "https://images.unsplash.com/photo-1517976487492-5750f3195933?w=800&q=82",
+  space5:  "https://images.unsplash.com/photo-1541185934-01b600ea069c?w=800&q=82",
+  infra1:  "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?w=800&q=82",
+  infra2:  "https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=800&q=82",
+  people1: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=800&q=82",
+  people2: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&q=82",
+  event1:  "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&q=82",
+  event2:  "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?w=800&q=82",
+  news1:   "https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=800&q=82",
+  galaxy:  "https://images.unsplash.com/photo-1419242902214-272b3f66ee7a?w=800&q=82",
+};
+
+const SECTIONS = {
+  home: { label:"Home", cards:[
+    { id:"images",    num:"1", label:"Images",    type:"drill", target:"imagery",   img:IMG.earth1 },
+    { id:"documents", num:"2", label:"Documents", type:"drill", target:"documents", img:IMG.space1 },
+    { id:"videos",    num:"3", label:"Videos",    type:"drill", target:"videos",    img:IMG.space4 },
+    { id:"links",     num:"4", label:"Links",     type:"drill", target:"links",     img:IMG.earth3, blue:true },
+    { id:"website",   num:"5", label:"Website",   type:"leaf",  img:IMG.infra1,
+      tag:"Link", title:"pixxel.space",
+      body:"The official Pixxel website — product overview, team, investor relations, and press resources.\n\nhttps://pixxel.space" },
+    { id:"contact",   num:"6", label:"Contact",   type:"leaf",  img:IMG.galaxy,
+      tag:"Contact", title:"Press contact",
+      body:"Media inquiries:\npress@pixxel.space\n\nPartnerships:\npartners@pixxel.space\n\nInvestor relations:\nir@pixxel.space" },
+  ]},
+  imagery: { label:"Images", cards:[
+    { id:"founders", num:"1", label:"Founders",    type:"gallery", img:IMG.people1,
+      tag:"Imagery", title:"Founders",
+      gallery:[
+        {src:IMG.people1, caption:"Awais Ahmed — CEO & Co-founder, Pixxel"},
+        {src:IMG.people2, caption:"Kshitij Khandelwal — CTO & Co-founder, Pixxel"},
+      ]},
+    { id:"launch",   num:"2", label:"Launch",      type:"gallery", img:IMG.space4,
+      tag:"Imagery", title:"Launch",
+      gallery:[
+        {src:IMG.space4, caption:"Firefly-1 launch — ISRO PSLV-C53, June 2022"},
+        {src:IMG.space5, caption:"Launch control room — Sriharikota"},
+      ]},
+    { id:"facility", num:"3", label:"Facility",    type:"gallery", img:IMG.sat1,
+      tag:"Imagery", title:"Facility",
+      gallery:[
+        {src:IMG.sat1, caption:"Satellite cleanroom — Pixxel HQ, Bangalore"},
+        {src:IMG.sat2, caption:"Structural assembly bay"},
+        {src:IMG.sat3, caption:"Payload integration"},
+      ]},
+    { id:"events",   num:"4", label:"Events",      type:"gallery", img:IMG.event1,
+      tag:"Imagery", title:"Events",
+      gallery:[
+        {src:IMG.event1, caption:"IN-SPACe industry event — Ahmedabad 2024"},
+        {src:IMG.event2, caption:"Pixxel at Space Tech Expo"},
+      ]},
+    { id:"news",     num:"5", label:"In the news", type:"gallery", img:IMG.news1,
+      tag:"Imagery", title:"In the news",
+      gallery:[
+        {src:IMG.news1, caption:"TechCrunch — Pixxel Series B announcement"},
+        {src:IMG.earth4, caption:"Forbes — India's new space economy"},
+      ]},
+    { id:"camera",   num:"6", label:"Camera",      type:"gallery", img:IMG.earth1,
+      tag:"Imagery", title:"Camera — Aurora captures",
+      gallery:[
+        {src:IMG.earth1, caption:"Aurora capture — false-color composite, Indian subcontinent"},
+        {src:IMG.earth2, caption:"Aurora — agricultural stress mapping, NDVI"},
+        {src:IMG.earth3, caption:"Aurora dashboard — spectral visualization"},
+        {src:IMG.earth4, caption:"Night pass — urban heat signature"},
+      ]},
+  ]},
+  documents: { label:"Documents", cards:[
+    { id:"factsheet", num:"1", label:"Fact sheet",    type:"leaf", img:IMG.earth2,
+      tag:"Document", title:"Pixxel at a glance",
+      body:"Founded: 2019, Bangalore, India\nSatellites: 3 operational (Shakuntala, Firefly-1, Firefly-2)\nSpectral range: 400–2500nm (VNIR + SWIR)\nGround resolution: 5m GSD\nRevisit time: 24hr full constellation\nTeam: 200+\nInvestors: Google, Lightspeed, GV, Radical Ventures\nMarkets: Agriculture · Forestry · Oil & Gas · Defence · Climate" },
+    { id:"pressrel",  num:"2", label:"Press release", type:"leaf", img:IMG.space2,
+      tag:"Document", title:"For immediate release",
+      body:"BANGALORE — Pixxel today announced the successful deployment of its Firefly constellation, marking a major milestone in the company's mission to deliver hyperspectral Earth observation at global scale.\n\nWith three satellites now operational, Aurora can deliver sub-daily revisits over key monitoring zones, unlocking new use cases in precision agriculture, environmental monitoring, and national security." },
+    { id:"narrative", num:"3", label:"PI narrative",  type:"leaf", img:IMG.galaxy,
+      tag:"Document", title:"Planetary intelligence",
+      body:"We are entering an era where every acre of Earth can be observed at spectral depth impossible a decade ago.\n\nPixxel's full-stack architecture — from satellite manufacturing to the Aurora analytics platform — closes the gap between raw orbital data and decision-ready intelligence.\n\nThis is not remote sensing. This is planetary intelligence." },
+    { id:"bios",      num:"4", label:"Founder bios",  type:"leaf", img:IMG.people1,
+      tag:"Document", title:"Founder biographies",
+      body:"Awais Ahmed — CEO & Co-founder\nForbes 30 Under 30 Asia. Founded Pixxel at 21. Leads commercial strategy and fundraising.\n\nKshitij Khandelwal — CTO & Co-founder\nBuilt Pixxel's first hyperspectral payload from scratch. Leads engineering across satellite hardware, ground systems, and Aurora." },
+    { id:"arch",      num:"5", label:"Architecture",  type:"leaf", img:IMG.infra2,
+      tag:"Document", title:"Full-stack architecture",
+      body:"1. Spacecraft manufacturing — in-house satellite production, Bangalore\n2. Hyperspectral sensor — 150+ bands, 400–2500nm\n3. Launch & operations — multi-vendor launch, 24/7 ops center\n4. Ground network — MegaPixxel ground station array\n5. Data pipeline — automated ingestion, calibration, orthorectification\n6. Aurora platform — analytics, APIs, band composites, change detection" },
+    { id:"timeline",  num:"6", label:"Milestones",    type:"leaf", img:IMG.space3,
+      tag:"Document", title:"Milestones",
+      body:"2019 — Pixxel founded, Bangalore\n2020 — Pre-seed: $700K\n2021 — Seed: $5M · First satellite integration begins\n2022 — Shakuntala launched (PSLV-C53)\n2022 — Series A: $25M (Google, Lightspeed)\n2023 — Firefly-1 & Firefly-2 launched\n2024 — Aurora platform launched commercially\n2024 — Series B: $36M (GV, Radical)\n2025 — Constellation expansion begins" },
+  ]},
+  videos: { label:"Videos", cards:[
+    { id:"hero",    num:"1", label:"Hero film",   type:"gallery", img:IMG.space1,
+      tag:"Video", title:"Hero film",
+      gallery:[
+        {src:IMG.space1, caption:"Hero film — opening sequence, Earth limb view"},
+        {src:IMG.space2, caption:"Hero film — constellation orbital path"},
+      ]},
+    { id:"broll",   num:"2", label:"B-roll",      type:"gallery", img:IMG.sat3,
+      tag:"Video", title:"B-roll",
+      gallery:[
+        {src:IMG.sat3,   caption:"B-roll — cleanroom assembly"},
+        {src:IMG.infra1, caption:"B-roll — ground station receive"},
+      ]},
+    { id:"aurorav", num:"3", label:"Aurora demo", type:"gallery", img:IMG.earth3,
+      tag:"Video", title:"Aurora demo",
+      gallery:[
+        {src:IMG.earth3, caption:"Aurora platform demo walkthrough"},
+        {src:IMG.earth1, caption:"False-color band composite demo"},
+      ]},
+    { id:"launchv", num:"4", label:"Launch",      type:"gallery", img:IMG.space4,
+      tag:"Video", title:"Launch footage",
+      gallery:[
+        {src:IMG.space4, caption:"Launch sequence — PSLV-C53"},
+        {src:IMG.space5, caption:"Payload fairing separation"},
+      ]},
+  ]},
+  links: { label:"Links", cards:[
+    { id:"web",    num:"1", label:"pixxel.space",    type:"leaf", img:IMG.earth1,
+      tag:"Link", title:"Official website", body:"https://pixxel.space" },
+    { id:"aurora", num:"2", label:"Aurora platform", type:"leaf", img:IMG.earth3,
+      tag:"Link", title:"Aurora", body:"https://aurora.pixxel.space" },
+    { id:"li",     num:"3", label:"LinkedIn",        type:"leaf", img:IMG.people1,
+      tag:"Link", title:"LinkedIn", body:"https://linkedin.com/company/pixxel" },
+    { id:"tw",     num:"4", label:"X / Twitter",     type:"leaf", img:IMG.space2,
+      tag:"Link", title:"X (Twitter)", body:"https://x.com/pixxelspace" },
+    { id:"cb",     num:"5", label:"Crunchbase",      type:"leaf", img:IMG.infra2,
+      tag:"Link", title:"Crunchbase", body:"https://crunchbase.com/organization/pixxel" },
+  ]},
+};
+
+/* ── card dimensions ── */
+/* SVG: w=401, h=415, shear=120  →  shear% = 120/415 = 28.92%
+   We pick card W=300, H=220
+   shear = 220 * 0.2892 = 63.6 → 64px
+   Spacing: step-x=60, step-y=50 (generous gaps)
+   Cards go: card[0]=bottom-left (frontmost), card[n-1]=top-right (backmost)
+   So we REVERSE order for visual stacking — card 0 drawn first (back), last drawn on top
+   label on left of each card
+*/
+const CW = 300, CH = 220;
+const SHEAR = 64;           // px, top-right is shifted down by this
+const STEP_X = 64;          // px right per card
+const STEP_Y = 54;          // px up per card (negative y)
+// hover: lift card up and slightly left — away from the stack
+const HOVER_DX = -12;
+const HOVER_DY = -20;
+
+let breadcrumbs = [{id:"home", label:"Home"}];
+let backTarget  = null; // section to return to on Back
+
+function renderStack(sid) {
+  const scene = document.getElementById("stack-scene");
+  scene.innerHTML = "";
+  const cards = SECTIONS[sid].cards;
+  const n = cards.length;
+
+  /* scene size — enough to contain all cards + labels */
+  const labelPad = 120; // space left of card for labels
+  const totalW = CW + STEP_X * (n - 1) + labelPad + 40;
+  const totalH = CH + STEP_Y * (n - 1) + SHEAR + 20;
+  scene.style.width  = totalW + "px";
+  scene.style.height = totalH + "px";
+  scene.style.position = "relative";
+
+  /*
+    Layout: card[0] = bottom-left (frontmost, lowest z)
+            card[n-1] = top-right (backmost, drawn first)
+    We draw from back to front (n-1 down to 0) so front cards are on top in DOM.
+    Position of card i (0=front):
+      left = labelPad + i * STEP_X
+      top  = (totalH - CH - SHEAR) - i * STEP_Y
+         (anchored to bottom, shifting up as i increases)
+  */
+  const baseTop = totalH - CH - SHEAR - 10;
+
+  // Draw back-to-front
+  for (let i = n - 1; i >= 0; i--) {
+    const c = cards[i];
+    const el = document.createElement("div");
+    el.className = "card" + (c.blue ? " card-blue" : "");
+
+    const left = labelPad + i * STEP_X;
+    const top  = baseTop  - i * STEP_Y;
+
+    el.style.cssText = `
+      left: ${left}px;
+      top:  ${top}px;
+      width: ${CW}px;
+      height: ${CH + SHEAR}px;
+      z-index: ${n - i};
+      position: absolute;
+    `;
+
+    el.innerHTML = `
+      <div class="card-shape" style="height:100%">
+        <img src="${c.img}" alt="${c.label}" loading="lazy" draggable="false">
+        <div class="card-shape-overlay"></div>
+      </div>
+      <div class="card-label">${c.num}. ${c.label}</div>
+    `;
+
+    el.addEventListener("mouseenter", () => {
+      el.style.transform = `translate(${HOVER_DX}px, ${HOVER_DY}px)`;
+      el.style.zIndex = 50;
+    });
+    el.addEventListener("mouseleave", () => {
+      el.style.transform = "";
+      el.style.zIndex = n - i;
+    });
+    el.addEventListener("click", () => handleCardClick(c, sid));
+    scene.appendChild(el);
+  }
+
+  updateBreadcrumb();
+}
+
+function handleCardClick(c, fromSid) {
+  if (c.type === "drill") {
+    breadcrumbs.push({id: c.target, label: c.label});
+    renderStack(c.target);
+  } else {
+    // navigate to inner view
+    backTarget = fromSid;
+    showInner(c);
+  }
+}
+
+function showInner(c) {
+  document.getElementById("view-home").classList.remove("active");
+  const inner = document.getElementById("view-inner");
+  inner.classList.add("active");
+  document.getElementById("inner-topbar-title").textContent = c.label;
+
+  const body = document.getElementById("inner-body");
+
+  if (c.type === "gallery") {
+    body.innerHTML = `
+      <p class="inner-tag">${c.tag}</p>
+      <h1 class="inner-title">${c.title}</h1>
+      <hr class="inner-hr">
+      <div class="gallery-grid">
+        ${c.gallery.map(g => `
+          <div class="gallery-item">
+            <img src="${g.src}" alt="${g.caption}" loading="lazy">
+            <p class="gallery-caption">${g.caption}</p>
+          </div>`).join("")}
+      </div>`;
+  } else {
+    body.innerHTML = `
+      <p class="inner-tag">${c.tag}</p>
+      <h1 class="inner-title">${c.title}</h1>
+      <hr class="inner-hr">
+      <div class="inner-text-body" id="itb">${c.body}</div>
+      <button class="copy-btn" id="cbtn">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" xmlns="http://www.w3.org/2000/svg">
+          <rect x="5" y="5" width="9" height="9" rx="1"/>
+          <path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2"/>
+        </svg>
+        Copy text
+      </button>`;
+    document.getElementById("cbtn").addEventListener("click", () => {
+      navigator.clipboard.writeText(c.body).then(() => {
+        const btn = document.getElementById("cbtn");
+        btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" xmlns="http://www.w3.org/2000/svg"><polyline points="2 8 6 12 14 4"/></svg> Copied`;
+        setTimeout(() => {
+          btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" xmlns="http://www.w3.org/2000/svg"><rect x="5" y="5" width="9" height="9" rx="1"/><path d="M11 5V3a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h2"/></svg> Copy text`;
+        }, 1800);
+      });
+    });
+  }
+}
+
+function goBack() {
+  document.getElementById("view-inner").classList.remove("active");
+  document.getElementById("view-home").classList.add("active");
+  if (backTarget) renderStack(backTarget);
+  backTarget = null;
+}
+
+function updateBreadcrumb() {
+  document.getElementById("breadcrumb").innerHTML = breadcrumbs.map((b, i) =>
+    i === breadcrumbs.length - 1
+      ? `<span class="current">${b.label}</span>`
+      : `<span class="crumb" onclick="jumpTo(${i})">${b.label}</span><span class="sep">/</span>`
+  ).join("");
+}
+
+function jumpTo(idx) {
+  breadcrumbs = breadcrumbs.slice(0, idx + 1);
+  renderStack(breadcrumbs[breadcrumbs.length - 1].id);
+}
+
+function showAbout() {
+  document.getElementById("view-home").classList.remove("active");
+  document.getElementById("view-inner").classList.remove("active");
+  document.getElementById("view-about").classList.add("active");
+}
+
+function goHome() {
+  breadcrumbs = [{id:"home", label:"Home"}];
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  document.getElementById("nav-all").classList.add("active");
+  document.getElementById("view-inner").classList.remove("active");
+  document.getElementById("view-about").classList.remove("active");
+  document.getElementById("view-home").classList.add("active");
+  renderStack("home");
+}
+
+function navFilter(f) {
+  document.querySelectorAll(".nav-item").forEach(n => n.classList.remove("active"));
+  document.getElementById("nav-" + f).classList.add("active");
+  document.getElementById("view-inner").classList.remove("active");
+  document.getElementById("view-about").classList.remove("active");
+  document.getElementById("view-home").classList.add("active");
+  if (f === "all") { renderStack("home"); return; }
+  if (SECTIONS[f]) {
+    breadcrumbs = [{id:"home", label:"Home"}, {id:f, label:SECTIONS[f].label}];
+    renderStack(f);
+  }
+}
+
+renderStack("home");
+</script>
+</body>
+</html>
