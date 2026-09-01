@@ -51,6 +51,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #home{align-items:center;justify-content:center;}
 .stack-scene{position:relative;flex-shrink:0;}
 .tile-label{position:absolute;font-family:'Barlow',sans-serif;font-size:0.73rem;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-off);white-space:nowrap;z-index:10;text-align:right;cursor:pointer;transition:color 0.2s;opacity:0;}
+html.device-phone .tile-label{display:none;}
 .tile-label.lit{color:var(--text);}
 .tile-label.revealed{opacity:1;}
 .iso-card{position:absolute;pointer-events:none;transition:transform 0.45s cubic-bezier(0.16,1,0.3,1);}
@@ -210,14 +211,14 @@ html.device-phone #home{align-items:center;}
 html.device-phone .stack-scene{margin:0 auto;}
 
 /* Category picker (5 image categories) -> styled like video gallery: 2-column tiles */
-html.device-phone .cat-grid{grid-template-columns:1fr 1fr;gap:10px;padding:24px var(--pad) 24px;}
+html.device-phone .cat-grid{grid-template-columns:1fr 1fr;gap:10px;padding:36px var(--pad) 24px;}
 
 /* Doc grid: single column already works well, just fix padding (remove double-padding) */
 html.device-phone .doc-grid{grid-template-columns:1fr;gap:14px;padding:0;}
 html.device-phone #about .inner-wrap{padding-top:56px;}
 
 /* Inside a gallery category (image list) -> styled like documents: 1-column, name + icon */
-html.device-phone .img-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:20px var(--pad) 24px;}
+html.device-phone .img-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:0;}
 html.device-phone .img-card{display:flex;flex-direction:column;}
 html.device-phone .img-thumb{width:100%;aspect-ratio:4/3;flex-shrink:0;filter:brightness(0.85);border-radius:0;}
 html.device-phone .img-card-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:8px;}
@@ -457,20 +458,25 @@ function initSelectable(container){
     if(el.dataset.selectableInit)return;
     el.dataset.selectableInit='1';
     el.classList.add('selectable');
-    el.addEventListener('pointerdown',onSelectPointerDown);
-    el.addEventListener('pointerup',onSelectPointerUp);
-    el.addEventListener('pointermove',()=>{pointerMoved=true;});
-    el.addEventListener('pointercancel',()=>clearTimeout(longPressTimer));
+    // Touch: plain touch events, passive (never blocks native scroll)
+    el.addEventListener('touchstart',onSelectStart,{passive:true});
+    el.addEventListener('touchmove',()=>{pointerMoved=true;},{passive:true});
+    el.addEventListener('touchend',onSelectEnd);
+    el.addEventListener('touchcancel',()=>clearTimeout(longPressTimer));
+    // Mouse: separate path for desktop/tablet trackpad, doesn't affect touch scroll at all
+    el.addEventListener('mousedown',onSelectStart);
+    el.addEventListener('mousemove',()=>{pointerMoved=true;});
+    el.addEventListener('mouseup',onSelectEnd);
   });
 }
-function onSelectPointerDown(e){
+function onSelectStart(e){
   pointerMoved=false;
   longPressTarget=e.currentTarget;
   longPressTimer=setTimeout(()=>{
     if(!pointerMoved){enterMultiSelect();toggleSelect(longPressTarget);}
   },500);
 }
-function onSelectPointerUp(e){
+function onSelectEnd(e){
   clearTimeout(longPressTimer);
   if(multiSelectMode&&!pointerMoved){
     e.preventDefault();e.stopPropagation();
